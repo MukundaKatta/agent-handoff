@@ -355,3 +355,47 @@ def test_store_add_new_returns_payload():
     store = HandoffStore(clock=lambda: 0.0)
     p = store.add_new("t")
     assert store.latest() is p
+
+
+def test_store_add_new_with_next_step_and_metadata():
+    store = HandoffStore(clock=lambda: 0.0)
+    p = store.add_new("t", next_step="continue", metadata={"ms": 7})
+    assert p.next_step == "continue"
+    assert p.metadata == {"ms": 7}
+
+
+def test_store_all_preserves_insertion_order():
+    store = HandoffStore()
+    p1 = HandoffPayload(task="first", status=HandoffStatus.COMPLETED)
+    p2 = HandoffPayload(task="second", status=HandoffStatus.FAILED)
+    store.add(p1)
+    store.add(p2)
+    assert store.all() == [p1, p2]
+
+
+# ---------------------------------------------------------------------------
+# HandoffPayload — serialisation extras
+# ---------------------------------------------------------------------------
+
+
+def test_to_dict_copies_metadata():
+    p = HandoffPayload(task="t", status=HandoffStatus.COMPLETED, metadata={"a": 1})
+    d = p.to_dict()
+    d["metadata"]["a"] = 999
+    assert p.metadata["a"] == 1  # original not mutated
+
+
+def test_from_dict_with_null_optional_fields():
+    p = HandoffPayload.from_dict(
+        {"task": "t", "status": "failed", "context": None, "metadata": None}
+    )
+    assert p.context == {}
+    assert p.metadata == {}
+
+
+def test_repr_truncation_boundary():
+    # Exactly 40 chars stays intact; 41 is truncated.
+    p40 = HandoffPayload(task="x" * 40, status=HandoffStatus.PENDING)
+    p41 = HandoffPayload(task="x" * 41, status=HandoffStatus.PENDING)
+    assert "..." not in repr(p40)
+    assert "..." in repr(p41)
